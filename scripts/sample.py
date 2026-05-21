@@ -1,5 +1,5 @@
 """
-Script para amostragem/geração a partir de um modelo treinado.
+Script for sampling/generation from a trained model.
 """
 
 import os

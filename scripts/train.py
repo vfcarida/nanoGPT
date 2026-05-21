@@ -1,11 +1,11 @@
 """
-Script de treinamento principal.
-Pode ser executado em uma GPU (debug mode) ou com Distributed Data Parallel (DDP).
+Main training script.
+Can be executed on a single GPU (debug mode) or with Distributed Data Parallel (DDP).
 
-Exemplo de uso (single GPU):
+Example usage (single GPU):
 $ python scripts/train.py --batch_size=32 --compile=False
 
-Exemplo com DDP (4 GPUs):
+Example with DDP (4 GPUs):
 $ torchrun --standalone --nproc_per_node=4 scripts/train.py
 """
 
@@ -20,7 +20,7 @@ import torch
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.distributed import init_process_group, destroy_process_group
 
-# Fallback temporário caso o pacote nanogpt não esteja instalado via pip
+# Temporary fallback in case the nanogpt package is not installed via pip
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 
 from nanogpt.model import GPTConfig, GPT
@@ -31,7 +31,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 logger = logging.getLogger(__name__)
 
 # -----------------------------------------------------------------------------
-# Configurações Padrão
+# Default Configurations
 # -----------------------------------------------------------------------------
 DEFAULT_CONFIG = {
     'out_dir': 'out',
@@ -78,7 +78,7 @@ DEFAULT_CONFIG = {
 def main():
     config = update_config_from_args(DEFAULT_CONFIG)
     
-    # Iniciação do DDP (Distributed Data Parallel)
+    # DDP (Distributed Data Parallel) Setup
     ddp = int(os.environ.get('RANK', -1)) != -1
     if ddp:
         init_process_group(backend=config['backend'])
@@ -111,7 +111,7 @@ def main():
     ptdtype = {'float32': torch.float32, 'bfloat16': torch.bfloat16, 'float16': torch.float16}[config['dtype']]
     ctx = nullcontext() if device_type == 'cpu' else torch.amp.autocast(device_type=device_type, dtype=ptdtype)
     
-    # Carregamento de dados (Dataloader rudimentar)
+    # Data Loading (Rudimentary dataloader)
     data_dir = os.path.join('data', config['dataset'])
     
     def get_batch(split: str):
@@ -131,7 +131,7 @@ def main():
             
         return x, y
 
-    # Recupera metadados do vocabulário
+    # Retrieve vocabulary metadata
     meta_path = os.path.join(data_dir, 'meta.pkl')
     meta_vocab_size = None
     if os.path.exists(meta_path):
@@ -141,7 +141,7 @@ def main():
         if master_process:
             logger.info(f"Found vocab_size = {meta_vocab_size} (inside {meta_path})")
 
-    # Setup do Modelo
+    # Model Setup
     model_args = dict(
         n_layer=config['n_layer'], 
         n_head=config['n_head'], 

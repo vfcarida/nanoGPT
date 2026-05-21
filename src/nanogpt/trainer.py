@@ -1,6 +1,6 @@
 """
-Módulo de treinamento isolado do nanoGPT.
-Contém a classe Trainer que encapsula o loop de otimização, validação e checkpointing.
+Isolated training module for nanoGPT.
+Contains the Trainer class that encapsulates the optimization loop, validation, and checkpointing.
 """
 
 import os
@@ -18,8 +18,8 @@ logger = logging.getLogger(__name__)
 
 class Trainer:
     """
-    Classe responsável por executar o loop de treinamento do modelo GPT.
-    Encapsula o controle de learning rate, estimativa de loss, backward pass e logging.
+    Class responsible for executing the training loop for the GPT model.
+    Encapsulates learning rate control, loss estimation, backward passes, and logging.
     """
 
     def __init__(
@@ -42,19 +42,19 @@ class Trainer:
         self.device = device
         self.master_process = master_process
         
-        # Estado interno
+        # Internal state
         self.iter_num = config.get('iter_num', 0)
         self.best_val_loss = config.get('best_val_loss', 1e9)
         self.local_iter_num = 0
         self.running_mfu = -1.0
         
-        # Unwrap model from DDP se necessário para acesso a métodos específicos
+        # Unwrap model from DDP if needed to access specific methods
         self.raw_model = self.model.module if isinstance(self.model, DDP) else self.model
 
     @torch.no_grad()
     def estimate_loss(self, eval_iters: int) -> Dict[str, float]:
         """
-        Estima a loss usando múltiplos batches nos splits de treino e validação.
+        Estimates the loss using multiple batches from both training and validation splits.
         """
         out = {}
         self.model.eval()
@@ -71,7 +71,7 @@ class Trainer:
 
     def get_lr(self, it: int) -> float:
         """
-        Calcula a learning rate atual baseada em cosine decay com warmup.
+        Calculates the current learning rate based on cosine decay with warmup.
         """
         lr = self.config['learning_rate']
         warmup_iters = self.config['warmup_iters']
@@ -92,7 +92,7 @@ class Trainer:
 
     def save_checkpoint(self, val_loss: float):
         """
-        Salva o modelo no disco se for o melhor loss atingido.
+        Saves the model to disk if the current validation loss is the best achieved so far.
         """
         out_dir = self.config['out_dir']
         always_save_checkpoint = self.config['always_save_checkpoint']
@@ -114,7 +114,7 @@ class Trainer:
 
     def train(self):
         """
-        Loop principal de treinamento.
+        Main training loop.
         """
         X, Y = self.get_batch('train')
         t0 = time.time()
@@ -131,7 +131,7 @@ class Trainer:
         batch_size = self.config['batch_size']
         wandb_log = self.config['wandb_log']
         
-        # Integration with wandb se habilitado e for master_process
+        # Integration with wandb if enabled and in master_process
         if wandb_log and self.master_process:
             import wandb
 
@@ -160,7 +160,7 @@ class Trainer:
             if self.iter_num == 0 and eval_only:
                 break
 
-            # Forward e backward passes com gradient accumulation
+            # Forward and backward passes with gradient accumulation
             for micro_step in range(gradient_accumulation_steps):
                 is_last_micro_step = (micro_step == gradient_accumulation_steps - 1)
                 
@@ -186,7 +186,7 @@ class Trainer:
             self.scaler.update()
             self.optimizer.zero_grad(set_to_none=True)
 
-            # Timing e logging local
+            # Timing and local logging
             t1 = time.time()
             dt = t1 - t0
             t0 = t1
@@ -202,6 +202,6 @@ class Trainer:
             self.iter_num += 1
             self.local_iter_num += 1
 
-            # Condição de parada
+            # Termination condition
             if self.iter_num > max_iters:
                 break

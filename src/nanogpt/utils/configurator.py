@@ -1,6 +1,6 @@
 """
-Utilitário de configuração para carregar hiperparâmetros de arquivos e CLI.
-Refatorado para não usar side-effects em variáveis globais do sistema.
+Configuration utility to load hyperparameters from files and CLI.
+Refactored to avoid side-effects on system global variables.
 """
 
 import sys
@@ -12,14 +12,14 @@ logger = logging.getLogger(__name__)
 
 def update_config_from_args(default_config: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Lê os argumentos da linha de comando e atualiza o dicionário de configurações base.
-    Pode carregar arquivos .py (executando-os em um namespace isolado) ou argumentos --key=value.
+    Reads command-line arguments and updates the base configuration dictionary.
+    Can load .py files (executing them in an isolated namespace) or --key=value arguments.
     
     Args:
-        default_config: Dicionário contendo as configurações padrão.
+        default_config: Dictionary containing the default configurations.
         
     Returns:
-        Um novo dicionário com as configurações atualizadas.
+        A new dictionary with the updated configurations.
     """
     config = default_config.copy()
     

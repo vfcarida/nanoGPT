@@ -1,6 +1,6 @@
 """
-Modelo GPT-2 implementado em PyTorch puro.
-Contém a arquitetura base para o nanoGPT, com suporte a Flash Attention.
+GPT-2 model implemented in pure PyTorch.
+Contains the base architecture for nanoGPT, with support for Flash Attention.
 """
 
 import math
@@ -31,8 +31,8 @@ class LayerNorm(nn.Module):
 
 class CausalSelfAttention(nn.Module):
     """
-    Mecanismo de Causal Self-Attention.
-    Suporta Flash Attention nativo do PyTorch 2.0+ para otimização de performance.
+    Causal Self-Attention mechanism.
+    Supports native Flash Attention in PyTorch 2.0+ for performance optimization.
     """
 
     def __init__(self, config: "GPTConfig"):
@@ -66,13 +66,13 @@ class CausalSelfAttention(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
-        Calcula a self-attention causal.
+        Computes causal self-attention.
         
         Args:
-            x (torch.Tensor): Tensor de entrada de shape (Batch, Time, Channels)
+            x (torch.Tensor): Input tensor of shape (Batch, Time, Channels)
             
         Returns:
-            torch.Tensor: Tensor processado de shape (Batch, Time, Channels)
+            torch.Tensor: Processed tensor of shape (Batch, Time, Channels)
         """
         B, T, C = x.size() # batch size, sequence length, embedding dimensionality (n_embd)
 
@@ -144,7 +144,7 @@ class Block(nn.Module):
 @dataclass
 class GPTConfig:
     """
-    Configurações da arquitetura GPT.
+    GPT architecture configuration parameters.
     """
     block_size: int = 1024
     vocab_size: int = 50304 # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
@@ -157,8 +157,8 @@ class GPTConfig:
 
 class GPT(nn.Module):
     """
-    Modelo Completo GPT.
-    Integra Embedding, Blocos de Transformer, e Camada Linear (LM Head).
+    Complete GPT Model.
+    Integrates Embedding layers, Transformer Blocks, and the final Linear layer (LM Head).
     """
 
     def __init__(self, config: GPTConfig):
@@ -194,7 +194,7 @@ class GPT(nn.Module):
 
     def get_num_params(self, non_embedding: bool = True) -> int:
         """
-        Retorna o número de parâmetros do modelo.
+        Returns the number of parameters in the model.
         """
         n_params = sum(p.numel() for p in self.parameters())
         if non_embedding:
@@ -211,14 +211,14 @@ class GPT(nn.Module):
 
     def forward(self, idx: torch.Tensor, targets: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         """
-        Forward pass.
+        Forward pass of the model.
         
         Args:
-            idx (torch.Tensor): Indices de tokens (batch_size, sequence_length).
-            targets (Optional[torch.Tensor]): Indices dos tokens alvo para cálculo da loss.
+            idx (torch.Tensor): Token indices of shape (batch_size, sequence_length).
+            targets (Optional[torch.Tensor]): Target token indices for loss computation.
             
         Returns:
-            Tuple[torch.Tensor, Optional[torch.Tensor]]: Logits e Loss (se targets foi fornecido).
+            Tuple[torch.Tensor, Optional[torch.Tensor]]: Logits and Loss (if targets are provided).
         """
         device = idx.device
         b, t = idx.size()
@@ -248,7 +248,7 @@ class GPT(nn.Module):
 
     def crop_block_size(self, block_size: int):
         """
-        Reduz o block size (context length) da configuração e corta matrizes internas.
+        Reduces the block size (context length) in the configuration and truncates internal tensors.
         """
         if block_size > self.config.block_size:
             raise ValueError(f"Target block size ({block_size}) must be <= current ({self.config.block_size})")
@@ -262,7 +262,7 @@ class GPT(nn.Module):
     @classmethod
     def from_pretrained(cls, model_type: str, override_args: Optional[Dict[str, Any]] = None) -> "GPT":
         """
-        Inicializa modelo com os pesos do GPT-2 da OpenAI.
+        Initializes the model using OpenAI's GPT-2 pretrained weights.
         """
         valid_models = {'gpt2', 'gpt2-medium', 'gpt2-large', 'gpt2-xl'}
         if model_type not in valid_models:
@@ -327,7 +327,7 @@ class GPT(nn.Module):
 
     def configure_optimizers(self, weight_decay: float, learning_rate: float, betas: Tuple[float, float], device_type: str) -> torch.optim.Optimizer:
         """
-        Configura o otimizador AdamW, separando tensores que sofrem weight decay.
+        Configures the AdamW optimizer, separating tensors that undergo weight decay.
         """
         param_dict = {pn: p for pn, p in self.named_parameters() if p.requires_grad}
         
@@ -355,7 +355,7 @@ class GPT(nn.Module):
 
     def estimate_mfu(self, fwdbwd_per_iter: int, dt: float) -> float:
         """ 
-        Estima a Model FLOPs Utilization (MFU) baseado nos TFLOPS da A100.
+        Estimates the Model FLOPs Utilization (MFU) based on A100 TFLOPS.
         """
         N = self.get_num_params()
         cfg = self.config
@@ -371,7 +371,7 @@ class GPT(nn.Module):
     @torch.no_grad()
     def generate(self, idx: torch.Tensor, max_new_tokens: int, temperature: float = 1.0, top_k: Optional[int] = None) -> torch.Tensor:
         """
-        Gera tokens a partir de um contexto `idx` fornecido de forma iterativa.
+        Iteratively generates new tokens from a provided context `idx`.
         """
         for _ in range(max_new_tokens):
             idx_cond = idx if idx.size(1) <= self.config.block_size else idx[:, -self.config.block_size:]

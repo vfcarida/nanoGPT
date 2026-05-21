@@ -1,41 +1,41 @@
-# Guia de Contribuição - nanoGPT Enterprise Edition
+# Contribution Guide - nanoGPT Enterprise Edition
 
-Primeiramente, obrigado pelo interesse em contribuir com a versão Enterprise do **nanoGPT**!
+First of all, thank you for your interest in contributing to the Enterprise version of **nanoGPT**!
 
-Este repositório visa manter um padrão elevado de Engenharia de Software. Siga os passos abaixo para submeter as suas contribuições.
+This repository aims to maintain a high standard of Software Engineering. Follow the steps below to submit your contributions.
 
-## 1. Relatando Bugs ou Sugerindo Melhorias
+## 1. Reporting Bugs or Suggesting Improvements
 
-- Certifique-se de que o problema ou funcionalidade não foi relatado anteriormente (busque nas issues).
-- Crie uma issue descrevendo detalhadamente o contexto, como reproduzir o bug (se aplicável), e qual o comportamento esperado.
+- Make sure the issue or feature hasn't been reported previously (search the issues).
+- Create an issue detailing the context, how to reproduce the bug (if applicable), and what the expected behavior is.
 
-## 2. Padrões de Código (Clean Code e SOLID)
+## 2. Code Standards (Clean Code and SOLID)
 
-- **Tipagem Estática:** Use `typing` para 100% das assinaturas das funções (Type Hinting).
-- **Docstrings:** Use o padrão Google ou NumPy para documentar a assinatura, retorno e descrição lógica de todos os métodos e classes públicas.
-- **Princípio da Responsabilidade Única:** Evite inflar arquivos. Se uma função ou classe ficou grande demais e abriga múltiplas responsabilidades lógicas, refatore e modularize.
+- **Static Typing:** Use `typing` for 100% of function signatures (Type Hinting).
+- **Docstrings:** Use the Google or NumPy standard to document the signature, return type, and logical description of all public methods and classes.
+- **Single Responsibility Principle:** Avoid bloating files. If a function or class becomes too large and houses multiple logical responsibilities, refactor and modularize it.
 
-## 3. Ambiente de Desenvolvimento
+## 3. Development Environment
 
-Certifique-se de possuir o ambiente isolado (virtual environment) instalado. Nós gerenciamos dependências usando `pyproject.toml`.
-Na raiz, execute:
+Make sure you have an isolated environment (virtual environment) installed. We manage dependencies using `pyproject.toml`.
+In the root directory, run:
 ```bash
 pip install -e ".[dev]"
 ```
 
-## 4. Testes (Pytest)
+## 4. Tests (Pytest)
 
-Não são aceitos Pull Requests sem a devida cobertura de testes para novas lógicas adicionadas, nem Pull Requests que quebrem os testes atuais.
-Para executar a suíte de testes:
+Pull Requests will not be accepted without proper test coverage for newly added logic, nor will Pull Requests that break existing tests.
+To run the test suite:
 ```bash
 pytest tests/
 ```
 
-## 5. Submetendo Pull Requests
+## 5. Submitting Pull Requests
 
-1. Crie um fork do repositório.
-2. Crie uma branch baseada no tipo de sua contribuição, ex: `feature/nova_camada`, `bugfix/fix-DDP`.
-3. Verifique a formatação do código executando o Black (e Flake8, opcionalmente).
-4. Submeta o PR apontando para a branch `main`.
+1. Fork the repository.
+2. Create a branch based on the type of your contribution, e.g., `feature/new_layer`, `bugfix/fix-DDP`.
+3. Check code formatting by running Black (and optionally Flake8).
+4. Submit the PR pointing to the `main` branch.
 
-Agradecemos o seu esforço para manter este repositório elegante, limpo e profissional!
+Thank you for your effort in keeping this repository elegant, clean, and professional!

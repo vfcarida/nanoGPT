@@ -1,5 +1,5 @@
 """
-Versão simplificada de treinamento para propósitos de benchmark.
+Simplified version of training specifically for benchmarking purposes.
 """
 
 import os

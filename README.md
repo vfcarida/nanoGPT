@@ -8,100 +8,99 @@
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Type Checking](https://img.shields.io/badge/type_checker-mypy-blue.svg)](http://mypy-lang.org/)
 
-O **repositório mais rápido e simples para treinar/afinar modelos GPT** em médias escalas. 
-Baseado na obra-prima original de [Andrej Karpathy](https://github.com/karpathy/nanoGPT), esta versão foi rigorosamente **refatorada para padrões Enterprise**, introduzindo arquitetura modular, Type Hinting, logging nativo estruturado, suporte total a empacotamento PyPI e separação estrita de responsabilidades (SOLID).
+The **simplest and fastest repository for training/fine-tuning medium-sized GPT models**. 
+Based on the original masterpiece by [Andrej Karpathy](https://github.com/karpathy/nanoGPT), this version has been rigorously **refactored to Enterprise standards**, introducing a modular architecture, Type Hinting, structured native logging, full PyPI packaging support, and strict separation of concerns (SOLID).
 
 </div>
 
 ---
 
-## 📖 Visão Geral
+## 📖 Overview
 
-`nanoGPT` é um repositório voltado para pesquisa e treinamento de modelos de linguagem (LLMs) estilo GPT-2, desenhado para ser legível, modificável e altamente otimizado (usando PyTorch 2.0+ `torch.compile` e `Flash Attention`).
+`nanoGPT` is a repository aimed at researching and training GPT-2 style language models (LLMs). It is designed to be readable, hackable, and highly optimized (using PyTorch 2.0+ `torch.compile` and `Flash Attention`).
 
-Esta versão traz melhorias estruturais profundas em relação ao código original focado em scripts soltos:
-- **Clean Architecture:** O núcleo do modelo (`GPT`, blocos transformer, trainer) foi isolado no pacote `src/nanogpt/`.
-- **Manutenibilidade:** Códigos 100% tipados e documentados (Docstrings).
-- **Sem Side-effects Globais:** Configurações carregam dicionários ou classes seguras no lugar de `exec(open(...))` poluindo o namespace local.
-- **Testes Prontos:** Cobertura de fluxo principal garantida com `pytest`.
+This version brings profound structural improvements over the original script-heavy code:
+- **Clean Architecture:** The core of the model (`GPT`, transformer blocks, trainer) has been isolated in the `src/nanogpt/` package.
+- **Maintainability:** 100% typed and documented code (Docstrings).
+- **No Global Side-effects:** Configurations load dictionaries or safe classes instead of using `exec(open(...))` which pollutes the local namespace.
+- **Test-Ready:** Main flow coverage is guaranteed with `pytest`.
 
-## 📂 Estrutura do Projeto
+## 📂 Project Structure
 
-Abaixo a visão de diretórios de forma limpa e organizada:
+Below is the clean and organized directory structure:
 
 ```text
 nanoGPT/
 ├── src/
-│   └── nanogpt/              # Pacote Core
-│       ├── model.py          # Arquitetura Transformer e GPT
-│       ├── trainer.py        # Loop de treinamento desacoplado
+│   └── nanogpt/              # Core Package
+│       ├── model.py          # Transformer and GPT Architecture
+│       ├── trainer.py        # Decoupled training loop
 │       └── utils/
-│           └── configurator.py # Parser de config seguro
-├── scripts/                  # Pontos de entrada CLI
+│           └── configurator.py # Safe configuration parser
+├── scripts/                  # CLI Entry Points
 │   ├── train.py
 │   ├── sample.py
 │   └── bench.py
-├── tests/                    # Suíte de testes (PyTest)
-├── config/                   # Configs baseadas em Python (herdadas)
-├── data/                     # Scripts de dados e datasets brutos
-├── pyproject.toml            # Manifestos PEP 621 e build-system
-└── requirements.txt          # Bloqueio de dependências
+├── tests/                    # Test Suite (PyTest)
+├── config/                   # Python-based configs (inherited)
+├── data/                     # Data scripts and raw datasets
+├── pyproject.toml            # PEP 621 manifests and build-system
+└── requirements.txt          # Dependency lock file
 ```
 
-## 🚀 Instalação e Pré-requisitos
+## 🚀 Installation & Prerequisites
 
-1. **Clone o repositório:**
+1. **Clone the repository:**
    ```bash
-   git clone https://github.com/seu-usuario/nanoGPT.git
+   git clone https://github.com/your-username/nanoGPT.git
    cd nanoGPT
    ```
 
-2. **Crie um ambiente virtual (Recomendado):**
+2. **Create a virtual environment (Recommended):**
    ```bash
    python -m venv venv
    source venv/bin/activate  # Linux/Mac
-   # No Windows use: venv\Scripts\activate
+   # On Windows use: venv\Scripts\activate
    ```
 
-3. **Instale as dependências com suporte a módulos:**
+3. **Install dependencies with module support:**
    ```bash
    pip install -e .
    ```
 
-## 🛠 Exemplos de Uso
+## 🛠 Usage Examples
 
-### 1. Treinamento de um Modelo Baby GPT
-Para treinar um GPT minúsculo no conjunto de dados de textos do Shakespeare:
+### 1. Training a Baby GPT Model
+To train a tiny GPT on the Shakespeare dataset:
 
-Primeiro, prepare o dataset:
+First, prepare the dataset:
 ```bash
 python data/shakespeare_char/prepare.py
 ```
 
-Em seguida, execute o script de treino apontando para um arquivo de configuração customizado na pasta `config/`:
+Then, run the training script pointing to a custom configuration file in the `config/` folder:
 ```bash
 python scripts/train.py config/train_shakespeare_char.py
 ```
 
 ### 2. DDP (Distributed Data Parallel)
-O `nanoGPT` suporta execução assíncrona transparente em múltiplas GPUs através do `torchrun`. Exemplo para treinar com 4 GPUs em um único nó:
+`nanoGPT` supports transparent asynchronous execution across multiple GPUs using `torchrun`. For example, to train on 4 GPUs in a single node:
 ```bash
 torchrun --standalone --nproc_per_node=4 scripts/train.py
 ```
 
-### 3. Geração de Textos (Inferência)
-Para amostrar tokens gerados pelo seu modelo após o treino (assume que os pesos foram salvos em `out/`):
+### 3. Text Generation (Inference)
+To sample generated tokens from your model after training (assuming weights are saved in `out/`):
 ```bash
 python scripts/sample.py --out_dir=out
 ```
 
-## 🤝 Contribuição
+## 🤝 Contributing
 
-Interessado em escalar esta infraestrutura? Veja o nosso guia [CONTRIBUTING.md](./CONTRIBUTING.md) para padrões de commit, fluxos de branch (Git Flow) e linting.
+Interested in scaling this infrastructure? Check out our [CONTRIBUTING.md](./CONTRIBUTING.md) guide for commit standards, branching workflows (Git Flow), and linting.
 
-## 📜 Licença e Créditos
+## 📜 License & Credits
 
-Este repositório é licenciado através da **MIT License**.
+This repository is licensed under the **MIT License**.
 
-- Autor original do nanoGPT: [Andrej Karpathy](https://github.com/karpathy/nanoGPT)
-- Refatoração Enterprise/Sênior: **Vinicius**
+- Original author of nanoGPT: [Andrej Karpathy](https://github.com/karpathy/nanoGPT)
