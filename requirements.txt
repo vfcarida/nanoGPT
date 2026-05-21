@@ -1,0 +1,13 @@
+# Core dependencies
+torch>=2.0.0
+numpy
+tiktoken
+transformers
+datasets
+wandb
+
+# Development dependencies
+pytest
+mypy
+black
+flake8

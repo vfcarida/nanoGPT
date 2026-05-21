@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nanogpt"
+version = "0.1.0"
+description = "Enterprise-grade refactor of Andrej Karpathy's nanoGPT."
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+authors = [
+    { name = "Andrej Karpathy", email = "andrej.karpathy@gmail.com" },
+    { name = "Vinicius", email = "vinicius@example.com" }
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "torch>=2.0.0",
+    "numpy",
+    "tiktoken",
+    "transformers",
+    "datasets",
+    "wandb"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "mypy",
+    "black",
+    "flake8"
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
