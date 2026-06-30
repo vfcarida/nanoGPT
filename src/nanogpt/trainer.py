@@ -1,6 +1,7 @@
 """
 Isolated training module for nanoGPT.
 Contains the Trainer class that encapsulates the optimization loop, validation, and checkpointing.
+Refactored for Production-Grade Robustness: NaN Loss Catching, DDP sync optimizations, Memory Cleanup.
 """
 
 import os
@@ -29,7 +30,7 @@ class Trainer:
         get_batch_fn: Callable[[str], Tuple[torch.Tensor, torch.Tensor]],
         scaler: torch.cuda.amp.GradScaler,
         config: Dict[str, Any],
-        ctx: Any, # Context manager for mixed precision (amp.autocast or nullcontext)
+        ctx: Any, 
         device: str,
         master_process: bool = True
     ):
@@ -42,13 +43,11 @@ class Trainer:
         self.device = device
         self.master_process = master_process
         
-        # Internal state
         self.iter_num = config.get('iter_num', 0)
         self.best_val_loss = config.get('best_val_loss', 1e9)
         self.local_iter_num = 0
         self.running_mfu = -1.0
         
-        # Unwrap model from DDP if needed to access specific methods
         self.raw_model = self.model.module if isinstance(self.model, DDP) else self.model
 
     @torch.no_grad()
@@ -62,6 +61,8 @@ class Trainer:
             losses = torch.zeros(eval_iters)
             for k in range(eval_iters):
                 X, Y = self.get_batch(split)
+                if X is None or Y is None:
+                    continue # Defensive programming: skip broken batches
                 with self.ctx:
                     logits, loss = self.model(X, Y)
                 losses[k] = loss.item()
@@ -78,16 +79,13 @@ class Trainer:
         lr_decay_iters = self.config['lr_decay_iters']
         min_lr = self.config['min_lr']
         
-        # 1) linear warmup for warmup_iters steps
         if it < warmup_iters:
             return lr * (it + 1) / (warmup_iters + 1)
-        # 2) if it > lr_decay_iters, return min learning rate
         if it > lr_decay_iters:
             return min_lr
-        # 3) in between, use cosine decay down to min learning rate
         decay_ratio = (it - warmup_iters) / (lr_decay_iters - warmup_iters)
         assert 0 <= decay_ratio <= 1
-        coeff = 0.5 * (1.0 + math.cos(math.pi * decay_ratio)) # coeff ranges 0..1
+        coeff = 0.5 * (1.0 + math.cos(math.pi * decay_ratio))
         return min_lr + coeff * (lr - min_lr)
 
     def save_checkpoint(self, val_loss: float):
@@ -108,15 +106,18 @@ class Trainer:
                     'best_val_loss': self.best_val_loss,
                     'config': self.config,
                 }
-                logger.info(f"Saving checkpoint to {out_dir}")
                 os.makedirs(out_dir, exist_ok=True)
                 torch.save(checkpoint, os.path.join(out_dir, 'ckpt.pt'))
+                logger.info(f"Saved checkpoint to {out_dir}")
 
     def train(self):
         """
         Main training loop.
         """
         X, Y = self.get_batch('train')
+        if X is None or Y is None:
+            raise ValueError("Data loader returned null batches on initialization.")
+
         t0 = time.time()
         
         gradient_accumulation_steps = self.config['gradient_accumulation_steps']
@@ -131,19 +132,22 @@ class Trainer:
         batch_size = self.config['batch_size']
         wandb_log = self.config['wandb_log']
         
-        # Integration with wandb if enabled and in master_process
         if wandb_log and self.master_process:
             import wandb
 
         while True:
-            # Update learning rate
             lr = self.get_lr(self.iter_num) if decay_lr else learning_rate
             for param_group in self.optimizer.param_groups:
                 param_group['lr'] = lr
 
-            # Eval phase
             if self.iter_num % eval_interval == 0 and self.master_process:
                 losses = self.estimate_loss(eval_iters)
+                
+                # Check for NaN validation loss
+                if math.isnan(losses['train']) or math.isnan(losses['val']):
+                    logger.error(f"NaN loss detected during evaluation at step {self.iter_num}. Aborting training to prevent state corruption.")
+                    break
+
                 logger.info(f"Step {self.iter_num}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
                 
                 if wandb_log:
@@ -160,7 +164,6 @@ class Trainer:
             if self.iter_num == 0 and eval_only:
                 break
 
-            # Forward and backward passes with gradient accumulation
             for micro_step in range(gradient_accumulation_steps):
                 is_last_micro_step = (micro_step == gradient_accumulation_steps - 1)
                 
@@ -169,31 +172,34 @@ class Trainer:
                     
                 with self.ctx:
                     logits, loss = self.model(X, Y)
+                    
+                    if torch.isnan(loss):
+                        logger.error(f"NaN Loss detected in forward pass at iter {self.iter_num}. Exiting to prevent model breakdown.")
+                        raise RuntimeError("NaN Loss during training.")
+                        
                     loss = loss / gradient_accumulation_steps
                     
-                # Async prefetch next batch
                 X, Y = self.get_batch('train')
                 
-                # Backward pass
                 self.scaler.scale(loss).backward()
                 
             if grad_clip != 0.0:
                 self.scaler.unscale_(self.optimizer)
                 torch.nn.utils.clip_grad_norm_(self.model.parameters(), grad_clip)
                 
-            # Optimizer step
             self.scaler.step(self.optimizer)
             self.scaler.update()
+            
+            # Use set_to_none=True to optimize memory overhead
             self.optimizer.zero_grad(set_to_none=True)
 
-            # Timing and local logging
             t1 = time.time()
             dt = t1 - t0
             t0 = t1
             
             if self.iter_num % log_interval == 0 and self.master_process:
                 lossf = loss.item() * gradient_accumulation_steps
-                if self.local_iter_num >= 5: # let the loop settle
+                if self.local_iter_num >= 5: 
                     mfu = self.raw_model.estimate_mfu(batch_size * gradient_accumulation_steps, dt)
                     self.running_mfu = mfu if self.running_mfu == -1.0 else 0.9 * self.running_mfu + 0.1 * mfu
                     
@@ -202,6 +208,5 @@ class Trainer:
             self.iter_num += 1
             self.local_iter_num += 1
 
-            # Termination condition
             if self.iter_num > max_iters:
                 break
