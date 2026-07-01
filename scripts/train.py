@@ -26,6 +26,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..',
 from nanogpt.model import GPTConfig, GPT
 from nanogpt.trainer import Trainer
 from nanogpt.utils.configurator import update_config_from_args
+from nanogpt.utils import PrefetchDataLoader
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -56,6 +57,7 @@ DEFAULT_CONFIG = {
     'n_embd': 768,
     'dropout': 0.0,
     'bias': False,
+    'gradient_checkpointing': False,
     
     'learning_rate': 6e-4,
     'max_iters': 600000,
@@ -111,25 +113,15 @@ def main():
     ptdtype = {'float32': torch.float32, 'bfloat16': torch.bfloat16, 'float16': torch.float16}[config['dtype']]
     ctx = nullcontext() if device_type == 'cpu' else torch.amp.autocast(device_type=device_type, dtype=ptdtype)
     
-    # Data Loading (Rudimentary dataloader)
+    # Data Loading (Optimized PrefetchDataLoader)
     data_dir = os.path.join('data', config['dataset'])
-    
-    def get_batch(split: str):
-        if split == 'train':
-            data = np.memmap(os.path.join(data_dir, 'train.bin'), dtype=np.uint16, mode='r')
-        else:
-            data = np.memmap(os.path.join(data_dir, 'val.bin'), dtype=np.uint16, mode='r')
-            
-        ix = torch.randint(len(data) - config['block_size'], (config['batch_size'],))
-        x = torch.stack([torch.from_numpy((data[i:i+config['block_size']]).astype(np.int64)) for i in ix])
-        y = torch.stack([torch.from_numpy((data[i+1:i+1+config['block_size']]).astype(np.int64)) for i in ix])
-        
-        if device_type == 'cuda':
-            x, y = x.pin_memory().to(device, non_blocking=True), y.pin_memory().to(device, non_blocking=True)
-        else:
-            x, y = x.to(device), y.to(device)
-            
-        return x, y
+    dataloader = PrefetchDataLoader(
+        data_dir=data_dir,
+        batch_size=config['batch_size'],
+        block_size=config['block_size'],
+        device=device
+    )
+    get_batch = dataloader.get_batch
 
     # Retrieve vocabulary metadata
     meta_path = os.path.join(data_dir, 'meta.pkl')
@@ -149,7 +141,8 @@ def main():
         block_size=config['block_size'],
         bias=config['bias'], 
         vocab_size=None, 
-        dropout=config['dropout']
+        dropout=config['dropout'],
+        gradient_checkpointing=config['gradient_checkpointing']
     )
     
     if config['init_from'] == 'scratch':
@@ -191,7 +184,7 @@ def main():
     config['model_args'] = model_args
     model.to(device)
 
-    scaler = torch.cuda.amp.GradScaler(enabled=(config['dtype'] == 'float16'))
+    scaler = torch.amp.GradScaler('cuda', enabled=(config['dtype'] == 'float16'))
     optimizer = model.configure_optimizers(config['weight_decay'], config['learning_rate'], (config['beta1'], config['beta2']), device_type)
     
     if config['init_from'] == 'resume':
@@ -204,7 +197,7 @@ def main():
     if ddp:
         model = DDP(model, device_ids=[ddp_local_rank])
         
-    if wandb_log and master_process:
+    if config['wandb_log'] and master_process:
         import wandb
         wandb.init(project=config['wandb_project'], name=config['wandb_run_name'], config=config)
 
@@ -219,7 +212,10 @@ def main():
         master_process=master_process
     )
     
-    trainer.train()
+    try:
+        trainer.train()
+    finally:
+        dataloader.close()
 
     if ddp:
         destroy_process_group()

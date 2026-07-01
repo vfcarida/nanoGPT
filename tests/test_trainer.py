@@ -55,7 +55,7 @@ def broken_get_batch(split: str) -> Tuple[torch.Tensor, torch.Tensor]:
     return None, None
 
 def test_trainer_initialization(dummy_model, dummy_optimizer, default_config):
-    scaler = torch.cuda.amp.GradScaler(enabled=False)
+    scaler = torch.amp.GradScaler('cuda', enabled=False)
     trainer = Trainer(
         model=dummy_model,
         optimizer=dummy_optimizer,
@@ -68,7 +68,7 @@ def test_trainer_initialization(dummy_model, dummy_optimizer, default_config):
     assert trainer is not None
 
 def test_trainer_learning_rate_schedule(dummy_model, dummy_optimizer, default_config):
-    scaler = torch.cuda.amp.GradScaler(enabled=False)
+    scaler = torch.amp.GradScaler('cuda', enabled=False)
     trainer = Trainer(
         dummy_model, dummy_optimizer, dummy_get_batch, scaler, default_config, DummyContext(), 'cpu'
     )
@@ -83,7 +83,7 @@ def test_trainer_learning_rate_schedule(dummy_model, dummy_optimizer, default_co
 
 def test_trainer_null_batch_fault_injection(dummy_model, dummy_optimizer, default_config):
     """Fault injection: testing how the trainer handles null batches from dataloader."""
-    scaler = torch.cuda.amp.GradScaler(enabled=False)
+    scaler = torch.amp.GradScaler('cuda', enabled=False)
     trainer = Trainer(
         dummy_model, dummy_optimizer, broken_get_batch, scaler, default_config, DummyContext(), 'cpu'
     )
@@ -92,7 +92,7 @@ def test_trainer_null_batch_fault_injection(dummy_model, dummy_optimizer, defaul
         trainer.train()
 
 def test_trainer_checkpointing(dummy_model, dummy_optimizer, default_config):
-    scaler = torch.cuda.amp.GradScaler(enabled=False)
+    scaler = torch.amp.GradScaler('cuda', enabled=False)
     trainer = Trainer(
         dummy_model, dummy_optimizer, dummy_get_batch, scaler, default_config, DummyContext(), 'cpu'
     )
@@ -108,7 +108,7 @@ def test_trainer_checkpointing(dummy_model, dummy_optimizer, default_config):
 
 def test_trainer_training_loop_execution(dummy_model, dummy_optimizer, default_config):
     """Test standard execution of the training loop for a few steps."""
-    scaler = torch.cuda.amp.GradScaler(enabled=False)
+    scaler = torch.amp.GradScaler('cuda', enabled=False)
     trainer = Trainer(
         dummy_model, dummy_optimizer, dummy_get_batch, scaler, default_config, DummyContext(), 'cpu'
     )

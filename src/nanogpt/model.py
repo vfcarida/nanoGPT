@@ -186,6 +186,7 @@ class GPTConfig:
     n_embd: int = 768
     dropout: float = 0.0
     bias: bool = False # Standardized to False for modern architectures
+    gradient_checkpointing: bool = False # Enable activation checkpointing for memory savings
 
 
 class GPT(nn.Module):
@@ -239,6 +240,8 @@ class GPT(nn.Module):
     def forward(self, idx: torch.Tensor, targets: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         device = idx.device
         b, t = idx.size()
+        if t == 0:
+            raise IndexError("Cannot forward empty sequence")
         if t > self.config.block_size:
             raise ValueError(f"Cannot forward sequence of length {t}, block size is only {self.config.block_size}")
             
@@ -249,7 +252,10 @@ class GPT(nn.Module):
         x = self.transformer.drop(tok_emb)
         
         for block in self.transformer.h:
-            x = block(x, freqs_cos, freqs_sin)
+            if self.config.gradient_checkpointing and self.training:
+                x = torch.utils.checkpoint.checkpoint(block, x, freqs_cos, freqs_sin, use_reentrant=False)
+            else:
+                x = block(x, freqs_cos, freqs_sin)
             
         x = self.transformer.ln_f(x)
 

@@ -28,6 +28,7 @@ DEFAULT_CONFIG = {
     'dtype': 'bfloat16' if torch.cuda.is_available() and torch.cuda.is_bf16_supported() else 'float16',
     'compile': True,
     'profile': False,
+    'gradient_checkpointing': False,
 }
 
 def main():
@@ -43,18 +44,19 @@ def main():
     ptdtype = {'float32': torch.float32, 'bfloat16': torch.bfloat16, 'float16': torch.float16}[config['dtype']]
     ctx = nullcontext() if device_type == 'cpu' else torch.amp.autocast(device_type=device_type, dtype=ptdtype)
 
+    dataloader = None
     if config['real_data']:
         dataset = 'openwebtext'
         data_dir = os.path.join('data', dataset)
         try:
-            train_data = np.memmap(os.path.join(data_dir, 'train.bin'), dtype=np.uint16, mode='r')
-            def get_batch(split):
-                data = train_data 
-                ix = torch.randint(len(data) - config['block_size'], (config['batch_size'],))
-                x = torch.stack([torch.from_numpy((data[i:i+config['block_size']]).astype(np.int64)) for i in ix])
-                y = torch.stack([torch.from_numpy((data[i+1:i+1+config['block_size']]).astype(np.int64)) for i in ix])
-                x, y = x.pin_memory().to(device, non_blocking=True), y.pin_memory().to(device, non_blocking=True)
-                return x, y
+            from nanogpt.utils import PrefetchDataLoader
+            dataloader = PrefetchDataLoader(
+                data_dir=data_dir,
+                batch_size=config['batch_size'],
+                block_size=config['block_size'],
+                device=device
+            )
+            get_batch = dataloader.get_batch
         except FileNotFoundError:
             logger.warning("Real data not found. Falling back to synthetic data.")
             config['real_data'] = False
@@ -69,6 +71,7 @@ def main():
         n_layer = 12, n_head = 12, n_embd = 768,
         dropout = 0, 
         bias = config['bias'],
+        gradient_checkpointing = config['gradient_checkpointing'],
     )
     model = GPT(gptconf)
     model.to(device)
@@ -79,50 +82,55 @@ def main():
         logger.info("Compiling model...")
         model = torch.compile(model) 
 
-    if config['profile']:
-        wait, warmup, active = 5, 5, 5
-        num_steps = wait + warmup + active
-        with torch.profiler.profile(
-            activities=[torch.profiler.ProfilerActivity.CPU, torch.profiler.ProfilerActivity.CUDA],
-            schedule=torch.profiler.schedule(wait=wait, warmup=warmup, active=active, repeat=1),
-            on_trace_ready=torch.profiler.tensorboard_trace_handler('./bench_log'),
-            record_shapes=False,
-            profile_memory=False,
-            with_stack=False, 
-            with_flops=True,
-            with_modules=False, 
-        ) as prof:
-            X, Y = get_batch('train')
-            for k in range(num_steps):
-                with ctx:
-                    logits, loss = model(X, Y)
+    try:
+        if config['profile']:
+            wait, warmup, active = 5, 5, 5
+            num_steps = wait + warmup + active
+            with torch.profiler.profile(
+                activities=[torch.profiler.ProfilerActivity.CPU, torch.profiler.ProfilerActivity.CUDA],
+                schedule=torch.profiler.schedule(wait=wait, warmup=warmup, active=active, repeat=1),
+                on_trace_ready=torch.profiler.tensorboard_trace_handler('./bench_log'),
+                record_shapes=False,
+                profile_memory=False,
+                with_stack=False, 
+                with_flops=True,
+                with_modules=False, 
+            ) as prof:
                 X, Y = get_batch('train')
-                optimizer.zero_grad(set_to_none=True)
-                loss.backward()
-                optimizer.step()
-                lossf = loss.item()
-                logger.info(f"{k}/{num_steps} loss: {lossf:.4f}")
-                prof.step() 
-    else:
-        torch.cuda.synchronize()
-        for stage, num_steps in enumerate([10, 20]): 
-            t0 = time.time()
-            X, Y = get_batch('train')
-            for k in range(num_steps):
-                with ctx:
-                    logits, loss = model(X, Y)
-                X, Y = get_batch('train')
-                optimizer.zero_grad(set_to_none=True)
-                loss.backward()
-                optimizer.step()
-                lossf = loss.item()
-                logger.info(f"{k}/{num_steps} loss: {lossf:.4f}")
+                for k in range(num_steps):
+                    with ctx:
+                        logits, loss = model(X, Y)
+                    X, Y = get_batch('train')
+                    optimizer.zero_grad(set_to_none=True)
+                    loss.backward()
+                    optimizer.step()
+                    lossf = loss.item()
+                    logger.info(f"{k}/{num_steps} loss: {lossf:.4f}")
+                    prof.step() 
+        else:
             torch.cuda.synchronize()
-            t1 = time.time()
-            dt = t1-t0
-            mfu = model.estimate_mfu(config['batch_size'] * 1 * num_steps, dt)
-            if stage == 1:
-                logger.info(f"time per iteration: {dt/num_steps*1000:.4f}ms, MFU: {mfu*100:.2f}%")
+            for stage, num_steps in enumerate([10, 20]): 
+                t0 = time.time()
+                X, Y = get_batch('train')
+                for k in range(num_steps):
+                    with ctx:
+                        logits, loss = model(X, Y)
+                    X, Y = get_batch('train')
+                    optimizer.zero_grad(set_to_none=True)
+                    loss.backward()
+                    optimizer.step()
+                    lossf = loss.item()
+                    logger.info(f"{k}/{num_steps} loss: {lossf:.4f}")
+                torch.cuda.synchronize()
+                t1 = time.time()
+                dt = t1-t0
+                mfu = model.estimate_mfu(config['batch_size'] * 1 * num_steps, dt)
+                if stage == 1:
+                    logger.info(f"time per iteration: {dt/num_steps*1000:.4f}ms, MFU: {mfu*100:.2f}%")
+
+    finally:
+        if dataloader is not None:
+            dataloader.close()
 
 if __name__ == '__main__':
     main()

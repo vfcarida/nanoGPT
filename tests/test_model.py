@@ -90,3 +90,31 @@ def test_generate():
     idx = torch.randint(0, 100, (2, 10))
     out = model.generate(idx, max_new_tokens=5, top_k=2)
     assert out.shape == (2, 15)
+
+def test_gradient_checkpointing():
+    """Test that model runs with gradient checkpointing enabled and computes grads."""
+    config = GPTConfig(
+        vocab_size=100,
+        block_size=64,
+        n_layer=2,
+        n_head=2,
+        n_embd=32,
+        gradient_checkpointing=True
+    )
+    model = GPT(config)
+    model.train() # checkpointing is only active during training mode
+    
+    idx = torch.randint(0, 100, (2, 32))
+    targets = torch.randint(0, 100, (2, 32))
+    
+    logits, loss = model(idx, targets)
+    assert loss is not None
+    assert not torch.isnan(loss)
+    
+    loss.backward()
+    
+    # Check that weights have gradients computed
+    for name, param in model.named_parameters():
+        if param.requires_grad:
+            assert param.grad is not None, f"Parameter {name} does not have grad set"
+
