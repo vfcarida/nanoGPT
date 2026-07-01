@@ -6,7 +6,7 @@
 ![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)
 ![Code Style: Black](https://img.shields.io/badge/code%20style-black-000000.svg)
 
-## Executive Vision
+## Overview
 
 Welcome to the enterprise-grade refactor of **nanoGPT**. The original repository served as an incredible educational resource for understanding the mechanics of GPT architectures. However, to transition from a learning resource into a production-ready template for scalable Language Model (LLM) training, it required a major architectural overhaul.
 
